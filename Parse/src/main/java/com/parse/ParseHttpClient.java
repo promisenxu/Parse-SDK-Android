@@ -54,6 +54,25 @@ import java.util.List;
     return httpClient;
   }
 
+  public static ParseHttpClient createClientForCloudCode(int socketConnectOperationTimeout,
+                                                         int socketReadOperationTimeout,
+                                             SSLSessionCache sslSessionCache) {
+    String httpClientLibraryName;
+    ParseHttpClient httpClient;
+    if (hasOkHttpOnClasspath()) {
+      httpClientLibraryName = OKHTTP_NAME;
+      httpClient =  new ParseOkHttpClient(socketConnectOperationTimeout, socketReadOperationTimeout, sslSessionCache);
+    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+      httpClientLibraryName = URLCONNECTION_NAME;
+      httpClient =  new ParseURLConnectionHttpClient(socketConnectOperationTimeout, sslSessionCache);
+    } else {
+      httpClientLibraryName = APACHE_HTTPCLIENT_NAME;
+      httpClient =  new ParseApacheHttpClient(socketConnectOperationTimeout, sslSessionCache);
+    }
+    PLog.i(TAG, "Using " + httpClientLibraryName + " library for networking communication.");
+    return httpClient;
+  }
+
   public static void setMaxConnections(int maxConnections) {
     if (maxConnections <= 0) {
       throw new IllegalArgumentException("Max connections should be large than 0");

@@ -208,7 +208,7 @@ import java.util.concurrent.atomic.AtomicReference;
   public ParseCloudCodeController getCloudCodeController() {
     if (cloudCodeController.get() == null) {
       cloudCodeController.compareAndSet(null, new ParseCloudCodeController(
-          ParsePlugins.get().restClient()));
+          ParsePlugins.get().restClientForCloudCode()));
     }
     return cloudCodeController.get();
   }

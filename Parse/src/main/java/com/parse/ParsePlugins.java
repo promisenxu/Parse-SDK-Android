@@ -59,6 +59,7 @@ import java.io.IOException;
   private final String clientKey;
 
   private ParseHttpClient restClient;
+  private ParseHttpClient restClientForCloudCode;
   private InstallationId installationId;
 
   /* package */ File parseDir;
@@ -83,6 +84,15 @@ import java.io.IOException;
     return ParseHttpClient.createClient(
         socketOperationTimeout,
         null);
+  }
+
+  public ParseHttpClient newHttpClientForCloudCode() {
+    int socketConnectOperationTimeout = 10 * 1000; // 10 seconds
+    int socketReadOperationTimeout = 30 * 1000; // 30 seconds
+    return ParseHttpClient.createClientForCloudCode(
+            socketConnectOperationTimeout,
+            socketReadOperationTimeout,
+            null);
   }
 
   /* package */ ParseHttpClient restClient() {
@@ -117,6 +127,41 @@ import java.io.IOException;
         });
       }
       return restClient;
+    }
+  }
+
+  public ParseHttpClient restClientForCloudCode() {
+    synchronized (lock) {
+      if (restClientForCloudCode == null) {
+        restClientForCloudCode = newHttpClientForCloudCode();
+        restClientForCloudCode.addInternalInterceptor(new ParseNetworkInterceptor() {
+          @Override
+          public ParseHttpResponse intercept(Chain chain) throws IOException {
+            ParseHttpRequest request = chain.getRequest();
+            ParseHttpRequest.Builder builder = new ParseHttpRequest.Builder(request)
+                    .addHeader(ParseRESTCommand.HEADER_APPLICATION_ID, applicationId)
+                    .addHeader(ParseRESTCommand.HEADER_CLIENT_KEY, clientKey)
+                    .addHeader(ParseRESTCommand.HEADER_CLIENT_VERSION, Parse.externalVersionName())
+                    .addHeader(
+                            ParseRESTCommand.HEADER_APP_BUILD_VERSION,
+                            String.valueOf(ManifestInfo.getVersionCode()))
+                    .addHeader(
+                            ParseRESTCommand.HEADER_APP_DISPLAY_VERSION,
+                            ManifestInfo.getVersionName())
+                    .addHeader(ParseRESTCommand.HEADER_OS_VERSION, Build.VERSION.RELEASE)
+                    .addHeader(ParseRESTCommand.USER_AGENT, userAgent());
+
+            // Only add the installationId if not already set
+            if (request.getHeader(ParseRESTCommand.HEADER_INSTALLATION_ID) == null) {
+              // We can do this synchronously since the caller is already in a Task on the
+              // NETWORK_EXECUTOR
+              builder.addHeader(ParseRESTCommand.HEADER_INSTALLATION_ID, installationId().get());
+            }
+            return chain.proceed(builder.build());
+          }
+        });
+      }
+      return restClientForCloudCode;
     }
   }
 
@@ -175,6 +220,17 @@ import java.io.IOException;
       return ParseHttpClient.createClient(
           socketOperationTimeout,
           sslSessionCache);
+    }
+
+    @Override
+    public ParseHttpClient newHttpClientForCloudCode() {
+      SSLSessionCache sslSessionCache = new SSLSessionCache(applicationContext);
+      int socketConnectOperationTimeout = 10 * 1000; // 10 seconds
+      int socketReadOperationTimeout = 30 * 1000;
+      return ParseHttpClient.createClientForCloudCode(
+              socketConnectOperationTimeout,
+              socketReadOperationTimeout,
+              sslSessionCache);
     }
 
     @Override

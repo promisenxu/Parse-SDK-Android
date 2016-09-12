@@ -59,6 +59,20 @@ import okio.Okio;
     okHttpClient = builder.build();
   }
 
+  public ParseOkHttpClient(int socketConnectOperationTimeout, int socketReadOperationTimeout, SSLSessionCache sslSessionCache) {
+
+    OkHttpClient.Builder builder = new OkHttpClient.Builder();
+
+    builder.connectTimeout(socketConnectOperationTimeout, TimeUnit.MILLISECONDS);
+    builder.readTimeout(socketReadOperationTimeout, TimeUnit.MILLISECONDS);
+
+    // Don't handle redirects. We copy the setting from AndroidHttpClient.
+    // For detail, check https://quip.com/Px8jAxnaun2r
+    builder.followRedirects(false);
+
+    okHttpClient = builder.build();
+  }
+
   @Override
   /* package */ ParseHttpResponse executeInternal(ParseHttpRequest parseRequest) throws IOException {
     Request okHttpRequest = getRequest(parseRequest);
